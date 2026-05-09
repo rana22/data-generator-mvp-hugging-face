@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import argparse
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -32,7 +32,6 @@ DEFAULT_SKIP = {
     "updated",
 }
 
-
 @dataclass(frozen=True)
 class Relationship:
     A: str
@@ -40,6 +39,7 @@ class Relationship:
     strength: float
     classification: str
     evidence: dict[str, Any]
+    a_to_b_mapping: dict[str, set[str]] = field(default_factory=dict)
 
 def _as_float(value: Any, default: float = 0.0) -> float:
     try:
@@ -243,30 +243,6 @@ class SyntheticDataGenerator:
             fields.append(name)
         return fields
 
-    # def _row_is_valid(self, row: dict[str, Any]) -> bool:
-    #     for rel in self.relationship_list:
-    #         a_val = normalize_value(row.get(rel.A))
-    #         b_val = normalize_value(row.get(rel.B))
-
-    #         if not a_val or not b_val:
-    #             return False
-
-    #         raw_map = rel.evidence.get("a_to_b_mapping")
-    #         mapping = _parse_a_to_b_mapping(raw_map)
-
-    #         # If we have no mapping for this pair, the row cannot be validated safely.
-    #         if not mapping:
-    #             return False
-
-    #         allowed = mapping.get(a_val)
-    #         if allowed is None:
-    #             return False
-
-    #         if allowed and b_val not in allowed:
-    #             return False
-
-    #     return True
-
     def _cluster_value_in_range(self, row: dict[str, Any], rel: Relationship, value: Any) -> bool:
         a_val = normalize_value(row.get(rel.A))
         if not a_val:
@@ -328,6 +304,43 @@ class SyntheticDataGenerator:
 
         return False
 
+    # def _row_is_valid(self, row: dict[str, Any]) -> bool:
+    #     for rel in self.relationship_list:
+    #         a_val = normalize_value(row.get(rel.A))
+    #         b_val = normalize_value(row.get(rel.B))
+
+    #         if not a_val or not b_val:
+    #             return False
+
+    #         feature_type = str(rel.evidence.get("feature_type", "")).strip().lower()
+
+    #         raw_map = rel.evidence.get("a_to_b_mapping")
+    #         mapping = _parse_a_to_b_mapping(raw_map)
+
+    #         # 1) strict mapping validation
+    #         if mapping:
+    #             allowed = mapping.get(a_val)
+    #             if allowed is None:
+    #                 return False
+    #             if allowed and b_val not in allowed:
+    #                 return False
+    #             continue
+
+    #         # 2) substring validation
+    #         if feature_type == "substring":
+    #             if a_val not in b_val and b_val not in a_val:
+    #                 return False
+    #             continue
+
+    #         # 3) clustering → DO NOT validate (handled in repair)
+    #         if feature_type == "cluster":
+    #             continue
+
+    #         # 4) everything else without mapping → skip
+    #         continue
+
+    #     return True
+
     def _row_is_valid(self, row: dict[str, Any]) -> bool:
         for rel in self.relationship_list:
             a_val = normalize_value(row.get(rel.A))
@@ -338,12 +351,9 @@ class SyntheticDataGenerator:
 
             feature_type = str(rel.evidence.get("feature_type", "")).strip().lower()
 
-            raw_map = rel.evidence.get("a_to_b_mapping")
-            mapping = _parse_a_to_b_mapping(raw_map)
-
             # 1) strict mapping validation
-            if mapping:
-                allowed = mapping.get(a_val)
+            if rel.a_to_b_mapping:
+                allowed = rel.a_to_b_mapping.get(a_val)
                 if allowed is None:
                     return False
                 if allowed and b_val not in allowed:
@@ -356,8 +366,8 @@ class SyntheticDataGenerator:
                     return False
                 continue
 
-            # 3) clustering → DO NOT validate (handled in repair)
-            if feature_type == "cluster":
+            # 3) clustering → DO NOT validate here
+            if feature_type in {"cluster", "clustering"}:
                 continue
 
             # 4) everything else without mapping → skip
@@ -373,6 +383,28 @@ class SyntheticDataGenerator:
         valid_df = df[mask].reset_index(drop=True)
         invalid_df = df[~mask].reset_index(drop=True)
         return valid_df, invalid_df
+
+    # def _build_relationship_list(self) -> list[Relationship]:
+    #     if self.relationships.empty:
+    #         return []
+
+    #     rels: list[Relationship] = []
+    #     for _, row in self.relationships.iterrows():
+    #         a = _clean_field_name(row.get("A", ""))
+    #         b = _clean_field_name(row.get("B", ""))
+    #         if not a or not b:
+    #             continue
+    #         if a not in self.allowed_fields or b not in self.allowed_fields:
+    #             continue
+
+    #         classification = str(row.get("classification", "")).strip().lower()
+    #         if classification not in RETAINED_CLASSIFICATIONS:
+    #             continue
+
+    #         strength = _as_float(row.get("strength", 0.0), 0.0)
+    #         evidence = row.to_dict()
+    #         rels.append(Relationship(A=a, B=b, strength=strength, classification=classification, evidence=evidence))
+    #     return rels
 
     def _build_relationship_list(self) -> list[Relationship]:
         if self.relationships.empty:
@@ -393,7 +425,18 @@ class SyntheticDataGenerator:
 
             strength = _as_float(row.get("strength", 0.0), 0.0)
             evidence = row.to_dict()
-            rels.append(Relationship(A=a, B=b, strength=strength, classification=classification, evidence=evidence))
+            mapping = _parse_a_to_b_mapping(row.get("a_to_b_mapping"))
+
+            rels.append(
+                Relationship(
+                    A=a,
+                    B=b,
+                    strength=strength,
+                    classification=classification,
+                    evidence=evidence,
+                    a_to_b_mapping=mapping,
+                )
+            )
         return rels
 
     def _build_parent_map(self) -> dict[str, Relationship]:
@@ -635,64 +678,3 @@ class SyntheticDataGenerator:
                 rows.append(row)
 
         return pd.DataFrame(rows, columns=self.generation_order)
-
-
-def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Generate synthetic sample-node rows from pairwise relationships")
-    parser.add_argument("--data", required=False, help="Path to the real flattened sample JSON array")
-    parser.add_argument("--schema", required=True, help="Path to the YAML schema for the sample node")
-    parser.add_argument("--relationships", required=True, help="Path to pairwise relationships CSV")
-    parser.add_argument("--study", required=True, help="Optional study ID for Neo4j extraction")
-    parser.add_argument("--env-path", required=False, default=None, help="Optional path to .env file")
-    parser.add_argument("--neo4j-limit", type=int, default=None, help="Optional limit for Neo4j rows")
-    parser.add_argument("--output", default="outputs/synthetic_rows.csv", help="Output file (.csv or .json)")
-    parser.add_argument("--n", type=int, default=50, help="Number of synthetic rows to generate")
-    parser.add_argument("--seed", type=int, default=42, help="Random seed")
-    parser.add_argument("--top-p", type=float, default=0.95, help="Top-p cutoff for conditional sampling")
-    parser.add_argument("--temp-strong", type=float, default=1.0, help="Sampling temperature for strong relations")
-    parser.add_argument("--temp-conditional", type=float, default=1.1, help="Sampling temperature for conditional relations")
-    parser.add_argument("--include-low-value-fields", action="store_true", help="Keep lower-value fields if present in the data")
-    return parser
-
-
-def main() -> None:
-    parser = build_parser()
-    args = parser.parse_args()
-
-    schema = load_node_schema(args.schema)
-    rel_df = pd.read_csv(args.relationships)
-
-    real_df = fetch_rows_from_neo4j(
-        schema,
-        study_id=args.study,
-        limit=args.neo4j_limit,
-        env_path=args.env_path,
-    )
-
-    if args.data:
-        real_df = load_json_rows(args.data)
-
-    generator = SyntheticDataGenerator(
-        real_rows=real_df,
-        relationships=rel_df,
-        schema=schema,
-        seed=args.seed,
-        top_p=args.top_p,
-        temperature_strong=args.temp_strong,
-        temperature_conditional=args.temp_conditional,
-        include_low_value_fields=args.include_low_value_fields,
-    )
-    synthetic_df = generator.generate(args.n)
-    valid_df, invalid_df = generator.validate_rows(synthetic_df)
-
-    output_path = Path(args.output)
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    save_dataframe(valid_df, output_path)
-
-    # Also save JSON next to CSV for easy inspection.
-    json_path = output_path.with_suffix(".json")
-    rows_to_json(valid_df.to_dict(orient="records"), json_path)
-
-
-if __name__ == "__main__":
-    main()

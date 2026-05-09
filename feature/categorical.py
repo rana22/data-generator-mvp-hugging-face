@@ -36,9 +36,9 @@ CATEGORICAL_WEIGHT_PROFILES = {
     },
     "diagnosis": {
         "support": 0.25,
-        "predictive_strength": 0.30,
-        "determinism": 0.20,
-        "stability": 0.15,
+        "predictive_strength": 0.0,
+        "determinism": 0.00,
+        "stability": 0.05,
         "doc_alignment": 0.10,
     },
     "file": {

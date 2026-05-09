@@ -1,4 +1,4 @@
-from collections import deque
+from collections import defaultdict, deque
 import pandas as pd
 
 def build_graph(rel_df):
@@ -15,20 +15,18 @@ def build_graph(rel_df):
 
     return graph
 
-def bfs_layers(graph, root="program"):
-    visited = set()
-    queue = deque([(root, [root])])
-
+def bfs_all_paths(graph, roots=["program"]):
+    queue = deque([(root, [root]) for root in roots])
     paths = []
+    seen_paths = set()
 
     while queue:
         node, path = queue.popleft()
 
-        if node in visited:
-            continue
-
-        visited.add(node)
-        paths.append(path)
+        key = tuple(path)
+        if key not in seen_paths:
+            seen_paths.add(key)
+            paths.append(path)
 
         for child in graph.get(node, []):
             if child not in path:

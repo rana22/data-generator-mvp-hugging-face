@@ -32,6 +32,13 @@ SUBSTRING_WEIGHT_PROFILES = {
         "substring_match": 0.25,
         "doc_alignment": 0.05,
     },
+     "case": {
+        "support": 0.15,
+        "prefix_match": 0.25,
+        "suffix_match": 0.30,
+        "substring_match": 0.25,
+        "doc_alignment": 0.05,
+    },
     "study": {
         "support": 0.10,
         "prefix_match": 0.30,

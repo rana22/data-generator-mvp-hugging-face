@@ -1,144 +1,76 @@
-// function expandableTextRenderer(params) {
-//   const maxLen = 80;
-//   const fullText = params.value == null ? "" : String(params.value);
-//   const isLong = fullText.length > maxLen;
+function ensureDialog() {
+  let dialog = document.getElementById("cell-value-dialog");
+  if (dialog) return dialog;
 
-//   let expanded = false;
+  dialog = document.createElement("dialog");
+  dialog.id = "cell-value-dialog";
+  dialog.style.padding = "20px";
+  dialog.style.maxWidth = "800px";
+  dialog.style.width = "80vw";
 
-//   const eGui = document.createElement("div");
-//   eGui.style.whiteSpace = "normal";
-//   eGui.style.lineHeight = "1.3";
+  dialog.innerHTML = `
+    <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:12px;">
+      <strong>Expanded value</strong>
+      <button id="cell-value-close" type="button">Close</button>
+    </div>
+    <pre id="cell-value-content" style="white-space:pre-wrap; word-break:break-word; margin:0;"></pre>
+  `;
 
-//   const textSpan = document.createElement("span");
-//   const toggle = document.createElement("button");
-//   toggle.type = "button";
-//   toggle.style.marginLeft = "6px";
-//   toggle.style.border = "none";
-//   toggle.style.background = "none";
-//   toggle.style.padding = "0";
-//   toggle.style.cursor = "pointer";
-//   toggle.style.color = "#0b5fff";
-//   toggle.style.fontSize = "12px";
+  document.body.appendChild(dialog);
 
-//   function render() {
-//     textSpan.textContent =
-//       !isLong || expanded ? fullText : fullText.slice(0, maxLen) + "...";
+  dialog.querySelector("#cell-value-close").addEventListener("click", () => {
+    dialog.close();
+  });
 
-//     toggle.textContent = expanded ? "show less" : "show more";
-//     toggle.style.display = isLong ? "inline" : "none";
-//   }
+  dialog.addEventListener("click", (e) => {
+    if (e.target === dialog) dialog.close();
+  });
 
-//   toggle.addEventListener("click", (e) => {
-//     e.preventDefault();
-//     e.stopPropagation();
-//     expanded = !expanded;
-//     render();
+  return dialog;
+}
 
-//     if (params.api) {
-//       params.api.resetRowHeights();
-//     }
-//   });
+function openValueDialog(value) {
+  const dialog = ensureDialog();
+  const content = dialog.querySelector("#cell-value-content");
+  content.textContent = value == null ? "" : String(value);
+  dialog.showModal();
+}
 
-//   eGui.appendChild(textSpan);
-//   eGui.appendChild(toggle);
-//   render();
+function expandableTextRenderer(params) {
+  const maxLen = 80;
+  const fullText = params.value == null ? "" : String(params.value);
+  const isLong = fullText.length > maxLen;
 
-//   return eGui;
-// }
+  const eGui = document.createElement("div");
+  eGui.style.whiteSpace = "normal";
+  eGui.style.lineHeight = "1.3";
+  eGui.style.cursor = isLong ? "pointer" : "default";
 
-// let gridApi = null;
+  const textSpan = document.createElement("span");
+  textSpan.textContent = !isLong ? fullText : fullText.slice(0, maxLen) + "...";
 
-// function initGrid() {
-//   const root = document.querySelector("#table-root");
-//   if (!root || root.dataset.agReady === "true") return;
-//   if (typeof agGrid === "undefined") return;
+  eGui.appendChild(textSpan);
 
-//   const rowTag = document.querySelector("#table-root-data");
-//   const colTag = document.querySelector("#table-root-cols");
-//   const searchInput = document.querySelector("#table-search");
+  if (isLong) {
+    eGui.title = "Click to expand";
+    eGui.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      openValueDialog(fullText);
+    });
+  }
 
-//   if (!rowTag || !colTag) return;
+  return eGui;
+}
 
-//   let rowData = [];
-//   let colDefs = [];
+document.addEventListener("click", (e) => {
+  const el = e.target.closest(".expandable-cell");
+  if (!el) return;
 
-//   try {
-//     rowData = JSON.parse(rowTag.textContent || "[]");
-//     colDefs = JSON.parse(colTag.textContent || "[]");
-//   } catch (e) {
-//     console.error("JSON parse error:", e);
-//     console.log("Row raw:", rowTag.textContent);
-//     console.log("Col raw:", colTag.textContent);
-//     return;
-//   }
-
-//   const INDEX_FIELDS = ["index", "level_0"];
-
-//   rowData = rowData.map(row => {
-//     const cleaned = { ...row };
-//     INDEX_FIELDS.forEach(f => delete cleaned[f]);
-//     return cleaned;
-//   });
-
-//   const LONG_TEXT_COLUMNS = ["evidence", "a_to_b_mapping", "classification"];
-
-//   colDefs = colDefs
-//   .filter(col => !INDEX_FIELDS.includes(col.field))
-//   .map(col => {
-//     const isLongText = LONG_TEXT_COLUMNS.includes(col.field);
-
-//     return {
-//       ...col,
-//       wrapText: true,
-//       autoHeight: true,
-//       cellRenderer: isLongText ? expandableTextRenderer : undefined,
-//     };
-//   });
-
-//   const gridOptions = {
-//     columnDefs: colDefs,
-//     rowData: rowData,
-
-//     defaultColDef: {
-//       sortable: true,
-//       filter: true,
-//       resizable: true,
-//       minWidth: 120,
-//     },
-
-//     pagination: true,
-//     paginationPageSize: 25,
-
-//     onGridReady: (params) => {
-//       gridApi = params.api;
-
-//       const allCols = params.columnApi.getColumns().map(c => c.getId());
-//       params.columnApi.autoSizeColumns(allCols);
-
-//       allCols.forEach(colId => {
-//         const col = params.columnApi.getColumn(colId);
-//         const width = col.getActualWidth();
-//         if (width > 400) {
-//           params.columnApi.setColumnWidth(colId, 400);
-//         }
-//       });
-//     }
-//   };
-
-//   agGrid.createGrid(root, gridOptions);
-
-//   // Hook up search box
-//   if (searchInput) {
-//     searchInput.addEventListener("input", (e) => {
-//       const value = e.target.value || "";
-//       if (gridApi) {
-//         gridApi.setGridOption("quickFilterText", value);
-//       }
-//     });
-//   }
-
-//   root.dataset.agReady = "true";
-// }
+  e.preventDefault();
+  e.stopPropagation();
+  openValueDialog(el.dataset.fullValue || "");
+});
 
 // window.addEventListener("load", initGrid);
 // new MutationObserver(initGrid).observe(document.body, { childList: true, subtree: true });

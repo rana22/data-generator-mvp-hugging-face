@@ -10,7 +10,7 @@ import yaml
 
 from node_relation import extract_relationships, relationships_to_dataframe, enrich_relationships_with_properties
 
-from graph.DFS import build_graph, bfs_layers, extract_clusters, cluster_with_relations_df, deduplicate
+from graph.DFS import build_graph, extract_clusters, cluster_with_relations_df, deduplicate, bfs_all_paths
 
 DEFAULT_SKIP = {"sample_id", "crdc_id", "comment", "uuid", "created", "updated"}
 
@@ -180,7 +180,6 @@ def build_relation_schemas(node_list_state):
         # ✅ Process relationships directly → rows
         relationships = node_model.get("Relationships", {})
         # avoid circular dependencies
-        explored_src_node = {}
 
         for rel_name, rel_spec in relationships.items():
             default_mul = rel_spec.get("Mul", "many_to_one")
@@ -250,129 +249,24 @@ def build_relation_schemas(node_list_state):
 
         # build node tree
         graph = build_graph(df)
-        paths = bfs_layers(graph)
-        valid_paths = [p for p in paths if 2 <= len(p) <= 4]
-        valid_paths = filter_paths_by_nodes(valid_paths, node_list_state)
-        valid_paths = valid_paths[:10]
+        # paths = bfs_layers(graph)
+        paths = bfs_all_paths(graph)
+        # valid_paths = [p for p in paths if 2 <= len(p) <= 4]
+        print(node_list_state)
+        for i in range(len(paths)):
+            print(paths[i])
+        print(len(paths))
+        valid_paths = filter_paths_by_nodes(paths, node_list_state)
+        # valid_paths = valid_paths[:10]
+        print(len(valid_paths))
+        for i in range(len(valid_paths)):
+            print(valid_paths[i])
 
         join_df = build_join_paths_df(valid_paths, df)
         return node_schemas, df, "", node_tree_df, join_df
 
     except Exception as e:
         return {}, None, f"Error on building relation\n{str(e)}"
-
-# def build_relation_schemas(node_list_state):
-#     import pandas as pd
-
-#     node_url = os.getenv("NODE_MODEL_URL", "")
-#     prop_url = os.getenv("PROP_MODEL_URL", "")
-
-#     try:
-#         node_model = load_yaml_from_url(node_url)
-#         prop_model = load_yaml_from_url(prop_url)
-
-#         nodes = _get_nodes(node_model)
-#         prop_defs = _get_prop_defs(prop_model)
-
-#         rows = []
-#         node_schemas = {}
-
-#         # ✅ Build schemas (same as before)
-#         for node_name, node_spec in nodes.items():
-#             if not isinstance(node_spec, dict):
-#                 continue
-
-#             merged = _normalize_node_spec(node_name, node_spec, prop_defs)
-#             merged = remove_yaml_anchors(merged)
-#             node_schemas[node_name] = merged
-
-#         # ✅ Process relationships directly → rows
-#         relationships = node_model.get("Relationships", {})
-#         # avoid circular dependencies
-#         explored_src_node = {}
-
-#         for rel_name, rel_spec in relationships.items():
-#             default_mul = rel_spec.get("Mul", "many_to_one")
-
-#             for end in rel_spec.get("Ends", []):
-#                 src = end.get("Src")
-#                 dst = end.get("Dst")
-
-#                 if src == dst:
-#                     continue
-
-#                 if not src or not dst:
-#                     continue
-
-#                 mul = (end.get("Mul") or default_mul).lower()
-
-#                 # --- resolve direction ---
-#                 if mul == "many_to_one":
-#                     parent, child, rel_type = dst, src, "one_to_many"
-#                 elif mul == "one_to_many":
-#                     parent, child, rel_type = src, dst, "one_to_many"
-#                 elif mul == "one_to_one":
-#                     parent, child, rel_type = dst, src, "one_to_one"
-#                 elif mul == "many_to_many":
-#                     parent, child, rel_type = src, dst, "many_to_many"
-#                 else:
-#                     parent, child, rel_type = dst, src, mul
-
-#                 parent_props = node_schemas.get(parent, {}).get("properties", {})
-#                 child_props = node_schemas.get(child, {}).get("properties", {})
-
-#                 matches = []
-
-#                 # ✅ simple inline matching (no extra function)
-#                 for p in parent_props:
-#                     for c in child_props:
-#                         if p == c or (p in c or c in p):
-#                             # optional filter → only id-like
-#                             if "id" in p or "id" in c:
-#                                 matches.append((p, c))
-
-#                 # ✅ write rows directly
-#                 if not matches:
-#                     rows.append({
-#                         "relation": rel_name,
-#                         "parent": parent,
-#                         "child": child,
-#                         "type": rel_type,
-#                         "parent_prop": None,
-#                         "child_prop": None,
-#                     })
-#                 else:
-#                     for p, c in matches:
-#                         rows.append({
-#                             "relation": rel_name,
-#                             "parent": parent,
-#                             "child": child,
-#                             "type": rel_type,
-#                             "parent_prop": f"{parent}.{p}",
-#                             "child_prop": f"{child}.{c}",
-#                         })
-
-#         df = pd.DataFrame(rows).sort_values(
-#             by=["parent", "child"]
-#         ).reset_index(drop=True)
-
-#         # build node tree
-#         graph = build_graph(df)
-#         path = bfs_layers(graph)
-#         clusters = extract_clusters(path)
-#         dedup_clusters = deduplicate(clusters)
-
-#         filtered_clusters = filter_clusters_by_nodes(
-#             dedup_clusters,
-#             node_list_state
-#         )
-#         dedup_clusters = filtered_clusters[:10]
-#         cluster_df = cluster_with_relations_df(dedup_clusters, df)
-
-#         return node_schemas, df, "", cluster_df
-
-#     except Exception as e:
-#         return {}, None, f"Error on building relation\n{str(e)}"
 
 def filter_paths_by_nodes(paths, node_list):
     node_set = set(node_list)
