@@ -67,3 +67,7 @@ table.sortable-table th {
     color: #888;
     font-size: 12px;
 }
+
+.col-max {
+    max-width: 250px;
+}

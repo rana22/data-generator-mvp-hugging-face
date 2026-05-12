@@ -271,8 +271,11 @@ class CrossNodeRelationshipEvaluator(FeatureBase):
                 continue
 
             for b in child_cols:
+                col_a = a
+                col_b = b
                 if a == b:
-                    continue
+                    col_a = f"{a}_{parent_node}"
+                    col_b = f"{b}_{child_node}"
 
                 child_values = child_values_by_col.get(b, [])
                 if len(child_values) == 0:
@@ -289,8 +292,8 @@ class CrossNodeRelationshipEvaluator(FeatureBase):
                 for av in parent_values:
                     for cv in child_values:
                         pair_rows.append({
-                            a: av,
-                            b: cv,
+                            col_a: av,
+                            col_b: cv,
                             "type": "cross_node_match",
                             "name": "cross_node_match",
                         })
@@ -304,7 +307,8 @@ class CrossNodeRelationshipEvaluator(FeatureBase):
                 
                 pair_df = pd.DataFrame(pair_rows)
 
-                result = self.fuzzy.analyze(pair_df, a, b)
+                # result = self.fuzzy.analyze(pair_df, a, b)
+                result = self.fuzzy.analyze(pair_df, col_a, col_b)
                 if result is None:
                     continue
 
@@ -333,6 +337,7 @@ class CrossNodeRelationshipEvaluator(FeatureBase):
         return results
 
 def run_cross_analysis(
+    weights,
     schema_state,
     node_data_state,
     all_edges,

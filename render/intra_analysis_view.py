@@ -39,6 +39,7 @@ def get_display_df(df: pd.DataFrame, feature_type: str) -> pd.DataFrame:
     return df[cols].copy()
 
 def view_intra_node_analysis(
+    weights_state,
     schema_state, 
     full_node_data_state,
     selected_node_table,
@@ -71,6 +72,7 @@ def view_intra_node_analysis(
     run_intra_node_analysis_btn.click(
         run_intra_node_analysis,
         inputs=[
+            weights_state,
             schema_state, 
             full_node_data_state, 
             selected_node_table
@@ -108,6 +110,7 @@ def view_intra_node_analysis(
     generate_btn.click(
         fn=generate_node_data,
         inputs=[
+            weights_state,
             schema_state,
             full_node_data_state,
             selected_node_table,

@@ -1,7 +1,7 @@
 from __future__ import annotations
 import re
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Optional
 
 import numpy as np
 import pandas as pd
@@ -101,14 +101,21 @@ def get_substring_weights(node_name: str) -> dict[str, float] | None:
 class SubstringFeatureAnalyzer:
     node_schema: NodeSchema
     doc_model: DocAlignmentModel
-    weights: dict[str, float] = field(init=False)
+    weights: Optional[dict[str, float]] = None
 
     def __post_init__(self) -> None:
         if self.node_schema is not None:
             key = self.node_schema.name
         else:
             key = "cross_node_match"
-        object.__setattr__(self, "weights", get_substring_weights(key))
+        # object.__setattr__(self, "weights", get_substring_weights(key))
+
+        default_weights = get_substring_weights(key) or {}
+        incoming_weights = self.weights or {}
+
+        # merge, with incoming weights taking priority
+        merged = {**default_weights, **incoming_weights}
+        object.__setattr__(self, "weights", merged)
 
     @staticmethod
     def classify_strength(score: float) -> str:

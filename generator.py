@@ -36,10 +36,19 @@ DEFAULT_SKIP = {
 class Relationship:
     A: str
     B: str
+    parent_node: str
+    child_node: str
     strength: float
     classification: str
     evidence: dict[str, Any]
     a_to_b_mapping: dict[str, set[str]] = field(default_factory=dict)
+
+def _split_node_property(value: str) -> tuple[str, str]:
+    value = _clean_field_name(value)
+    if "." not in value:
+        return None, value
+    node, prop = value.split(".", 1)
+    return node.strip(), prop.strip()
 
 def _as_float(value: Any, default: float = 0.0) -> float:
     try:
@@ -188,6 +197,7 @@ class SyntheticDataGenerator:
         real_rows: pd.DataFrame,
         relationships: pd.DataFrame,
         schema: NodeSchema,
+        synth_df: pd.DataFrame,
         *,
         seed: int = 42,
         top_p: float = 0.95,
@@ -199,6 +209,7 @@ class SyntheticDataGenerator:
         self.real_rows = real_rows.copy()
         self.relationships = relationships.copy()
         self.schema = schema
+        self.synth_df = synth_df.copy() if synth_df is not None else None
         self.rng = np.random.default_rng(seed)
         self.top_p = top_p
         self.temperature_strong = temperature_strong
@@ -414,8 +425,19 @@ class SyntheticDataGenerator:
         for _, row in self.relationships.iterrows():
             a = _clean_field_name(row.get("A", ""))
             b = _clean_field_name(row.get("B", ""))
+
+            if self.schema.name == "case":
+                print(f"{a} -> {b}")
             if not a or not b:
                 continue
+
+            parent_node, a = _split_node_property(a)
+            child_node, b = _split_node_property(b)
+
+            if parent_node is None:
+                parent_node = self.schema.name
+                child_node = self.schema.name
+
             if a not in self.allowed_fields or b not in self.allowed_fields:
                 continue
 
@@ -431,12 +453,15 @@ class SyntheticDataGenerator:
                 Relationship(
                     A=a,
                     B=b,
+                    parent_node=parent_node,
+                    child_node=child_node,
                     strength=strength,
                     classification=classification,
                     evidence=evidence,
                     a_to_b_mapping=mapping,
                 )
             )
+            
         return rels
 
     def _build_parent_map(self) -> dict[str, Relationship]:

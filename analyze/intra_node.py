@@ -46,24 +46,28 @@ class RelationshipResult:
         return cls(**row)
 
 class PairwiseRelationshipEvaluator(FeatureBase):
-    def __init__(self, node_schema: NodeSchema):
+    def __init__(self, node_schema: NodeSchema, weights: dict[str, float] | None = None):
         self.node_schema = node_schema
         self.doc_model = DocAlignmentModel().fit(node_schema)
         self.categorical = CategoricalFeatureAnalyzer(
             node_schema=self.node_schema,
             doc_model=self.doc_model,
+            weights=weights.get("categorical", None)
         )
         self.substring = SubstringFeatureAnalyzer(
             node_schema=self.node_schema,
             doc_model=self.doc_model,
+            weights=weights.get("substring", None)
         )
         self.cluster = ClusteringFeatureAnalyzer(
             node_schema=self.node_schema,
             doc_model=self.doc_model,
+            weights=weights.get("cluster", None)
         )
         self.bio_term = BioTermFeatureAnalyzer(
             node_schema=self.node_schema,
             doc_model=self.doc_model,
+            weights=weights.get("bio-term", None)
         )
 
     def get_model_columns(self, df: pd.DataFrame) -> list[str]:
@@ -112,7 +116,7 @@ class PairwiseRelationshipEvaluator(FeatureBase):
 def build_evaluator(node_schema: NodeSchema) -> PairwiseRelationshipEvaluator:
     return PairwiseRelationshipEvaluator(node_schema=node_schema)
 
-def run_intra_node_analysis(schema_state, data_state, selected_node):
+def run_intra_node_analysis(weights_state, schema_state, data_state, selected_node):
     try:
         if not schema_state:
             raise gr.Error("Load schema first.")
@@ -128,7 +132,7 @@ def run_intra_node_analysis(schema_state, data_state, selected_node):
         if df is None or df.empty:
             return {}, {}, f"No data available for node `{selected_node}`.", pd.DataFrame(),
 
-        engine = PairwiseRelationshipEvaluator(schema)
+        engine = PairwiseRelationshipEvaluator(schema, weights_state)
         results = engine.evaluate_all_pairs(df)
 
         summary_md = build_status_md(schema.name, None, results)

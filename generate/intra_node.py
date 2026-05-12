@@ -10,6 +10,7 @@ from render.table.component import (
 )
 
 def generate_node_data(
+    weights_state,
     schema_state,
     data_state,
     selected_node,
@@ -35,7 +36,7 @@ def generate_node_data(
             raise gr.Error(f"No data found for node '{selected_node}'.")
 
         # run relationship analysis first
-        engine = PairwiseRelationshipEvaluator(schema)
+        engine = PairwiseRelationshipEvaluator(schema, weights_state)
         results = engine.evaluate_all_pairs(df)
 
         if results.empty:
@@ -46,6 +47,7 @@ def generate_node_data(
             real_rows=df,
             relationships=results,
             schema=schema,
+            synth_df=None
         )
         synth_df = gen.generate(int(num_rows))
         valid_df, invalid_df = gen.validate_rows(synth_df)

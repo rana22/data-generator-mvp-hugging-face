@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Set
+from typing import Any, Dict, List, Optional
 
 import numpy as np
 import pandas as pd
@@ -80,11 +80,17 @@ def call_bio_dataset_service(node_schema: NodeSchema, df: pd.DataFrame) -> list[
 class BioTermFeatureAnalyzer:
     node_schema: NodeSchema
     doc_model: DocAlignmentModel
-    weights: dict[str, float] = field(init=False)
+    weights: Optional[dict[str, float]] = None
     _bio_cache: Dict[tuple, float] | None = field(default=None, init=False)
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, "weights", get_bioterm_weights(self.node_schema.name))
+        # object.__setattr__(self, "weights", get_bioterm_weights(self.node_schema.name))
+        default_weights = get_bioterm_weights(self.node_schema.name) or {}
+        incoming_weights = self.weights or {}
+
+        # merge, with incoming weights taking priority
+        merged = {**default_weights, **incoming_weights}
+        object.__setattr__(self, "weights", merged)
 
     @staticmethod
     def classify_strength(score: float) -> str:

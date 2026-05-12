@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Optional
 
 import numpy as np
 import pandas as pd
@@ -28,10 +28,16 @@ def get_clustering_weights(node_name: str) -> dict[str, float]:
 class ClusteringFeatureAnalyzer:
     node_schema: NodeSchema
     doc_model: DocAlignmentModel
-    weights: dict[str, float] = field(init=False)
+    weights: Optional[dict[str, float]] = None
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, "weights", get_clustering_weights(self.node_schema.name))
+        # object.__setattr__(self, "weights", get_clustering_weights(self.node_schema.name))
+        default_weights = get_clustering_weights(self.node_schema.name) or {}
+        incoming_weights = self.weights or {}
+
+        # merge, with incoming weights taking priority
+        merged = {**default_weights, **incoming_weights}
+        object.__setattr__(self, "weights", merged)
 
     @staticmethod
     def classify_strength(score: float) -> str:

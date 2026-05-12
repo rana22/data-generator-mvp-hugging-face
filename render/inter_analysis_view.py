@@ -86,6 +86,7 @@ def generate_cross_node_data(
 
 
 def compute_cross_node_analysis(
+    weights_state,
     schema_state,
     selected_nodes,
     node_data_state,
@@ -104,26 +105,55 @@ def compute_cross_node_analysis(
         ]
         print(f"edges_out -> {edges_out}")
         
-        print("engine")
         for _, row in edges_out.iterrows():
             parent = row["parent"]
             child = row["child"]
             print(parent, "->", child)
             try:
+                # df = node_data_state.get(child)
+                # if df is None or df.empty:
+                #     continue
+                # schema = next((s for s in schema_state if s.name == child), None)
+                # engine = PairwiseRelationshipEvaluator(schema, weights_state)
+                # results = engine.evaluate_all_pairs(df)
+
+                # mask = filtered_analysis_df["B"].astype(str).str.lower().str.startswith(child.lower() + ".")
+                # cross_node_validation = filtered_analysis_df[mask].copy().reset_index(drop=True)
+
+                # combined = pd.concat([results, cross_node_validation], ignore_index=True, sort=False)
+                
+                # full_analysis[child] = combined
+
                 df = node_data_state.get(child)
-                if df is None or df.empty:
-                    continue
-                schema = next((s for s in schema_state if s.name == child), None)
-                engine = PairwiseRelationshipEvaluator(schema)
-                results = engine.evaluate_all_pairs(df)
 
-                mask = filtered_analysis_df["B"].astype(str).str.lower().str.startswith(child.lower() + ".")
-                cross_node_validation = filtered_analysis_df[mask].copy().reset_index(drop=True)
+                # Default empty frames
+                results = pd.DataFrame()
+                cross_node_validation = pd.DataFrame()
 
-                combined = pd.concat([results, cross_node_validation], ignore_index=True, sort=False)
+                if df is not None and not df.empty:
+                    schema = next((s for s in schema_state if s.name == child), None)
+
+                    if schema is not None:
+                        engine = PairwiseRelationshipEvaluator(schema, weights_state)
+                        results = engine.evaluate_all_pairs(df)
+
+                # cross-node filter (safe even if empty)
+                if not filtered_analysis_df.empty:
+                    mask = filtered_analysis_df["B"].astype(str).str.lower().str.startswith(child.lower() + ".")
+                    cross_node_validation = filtered_analysis_df[mask].copy().reset_index(drop=True)
+
+                # combine safely
+                if not results.empty or not cross_node_validation.empty:
+                    combined = pd.concat([results, cross_node_validation], ignore_index=True, sort=False)
+                else:
+                    # 👇 THIS is what you want
+                    combined = pd.DataFrame()
+
+                # 👇 ALWAYS assign
                 full_analysis[child] = combined
             except Exception as e:
                 print( f"[compute_node_analysis] {child} - {str(e)}")
+                full_analysis[child] = pd.DataFrame()
                 continue
         return filtered_analysis_df, gr_selector, full_analysis, ""
     except Exception as e:
@@ -137,31 +167,65 @@ def create_cross_node_data(
     edges_out,
     num_rows = 50
 ):
+    print(f"create_cross_node_data {(node_data_state.keys())}")
+    print(selected_nodes)
+    print(edges_out)
     full_data: dict[str, pd.DataFrame] = {}
     gr_selector = gr.update(choices=selected_nodes, value=selected_nodes[0] if selected_nodes else None)
 
     try:
 
         for _, row in edges_out.iterrows():
+            print(f"parent-> child {row["parent"]} -> {row["child"]}")
             parent = row["parent"]
             child = row["child"]
+            print("schema")
             schema = next((s for s in schema_state if s.name == child), None)
             # print(f"schema {schema}")
+            print("node_data_state")
             df = node_data_state.get(child)
             node_analysis = all_node_analysis.get(child)
+
+            if df is None:
+                print(f"Missing df for child={child}. Available keys: {list(node_data_state.keys())}")
+                return
+
+            if node_analysis is None:
+                print(f"Missing node_analysis for child={child}. Available keys: {list(all_node_analysis.keys())}")
+                return
             # generate synthetic data
+            print("SyntheticDataGenerator")
             gen = SyntheticDataGenerator(
                 real_rows=df,
                 relationships=node_analysis,
                 schema=schema,
+                synth_df=full_data
             )
             synth_df = gen.generate(int(num_rows))
             full_data[child] = synth_df
+        print("full_data - gr_selector")
         return full_data, gr_selector, ""
     except Exception as e:
+        print(f"exception - generate_cross_node_data {str(e)}")
         return None, [], f"[generate_cross_node_data] {str(e)}"
 
+def log_full_node_data_shapes(full_node_data_state):
+    if not isinstance(full_node_data_state, dict) or not full_node_data_state:
+        print("full_node_data_state is empty or not a dict")
+        return
+
+    for node, df in full_node_data_state.items():
+        if df is None:
+            print(f"{node}: None")
+        else:
+            try:
+                print(f"{node}: {df.shape}")
+            except Exception as e:
+                print(f"{node}: could not read shape ({type(df)}), error={e}")
+
+
 def view_inter_nodes_analysis(
+    weights_state,
     data_upload,
     selected_node_table,
     selected_node_dataframe,
@@ -172,6 +236,8 @@ def view_inter_nodes_analysis(
     edges_out,
     error_box
 ):
+    print("full node data - view_inter_nodes_analysis")
+    log_full_node_data_shapes(full_node_data_state)
     print("view_inter_nodes_analysis")
     # cross node validation
     gr.Markdown("## Cross Node Analysis")
@@ -223,6 +289,7 @@ def view_inter_nodes_analysis(
     cross_btn.click(
         fn=run_cross_analysis,
         inputs=[
+            weights_state,
             schema_state,
             full_node_data_state,
             edges,
@@ -298,6 +365,7 @@ def view_inter_nodes_analysis(
     all_node_analysis_btn.click(
         fn=compute_cross_node_analysis,
         inputs=[
+            weights_state,
             schema_state,
             node_selector,
             full_node_data_state,
@@ -358,3 +426,5 @@ def view_inter_nodes_analysis(
             view_node_data,
         ]
     )
+
+    return error_box

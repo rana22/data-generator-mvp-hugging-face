@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Optional
 
 import numpy as np
 import pandas as pd
@@ -126,7 +126,7 @@ def mean_score(values: list[float]) -> float:
 class FuzzyFeatureAnalyzer:
     node_schema: NodeSchema | None
     doc_model: DocAlignmentModel | None
-    weights: dict[str, float] = field(init=False)
+    weights: Optional[dict[str, float]] = None
 
     def __post_init__(self) -> None:
         if self.node_schema is not None:
@@ -134,11 +134,14 @@ class FuzzyFeatureAnalyzer:
         else:
             key = "cross_node_match"
 
-        weights = get_fuzzy_weights(key)
-        if weights is None:
-            weights = FUZZY_WEIGHT_PROFILES["cross_node_match"]
+        default_weights = get_fuzzy_weights(key)
+        if default_weights is None:
+            default_weights = FUZZY_WEIGHT_PROFILES["cross_node_match"]
 
-        object.__setattr__(self, "weights", weights)
+        incoming_weights = self.weights or {}
+        # merge, with incoming weights taking priority
+        merged = {**default_weights, **incoming_weights}
+        object.__setattr__(self, "weights", merged)
 
     @staticmethod
     def classify_strength(score: float) -> str:

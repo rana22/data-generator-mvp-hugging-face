@@ -22,8 +22,7 @@ from schema import NodeSchema
 load_dotenv()
 
 MISSING_STRINGS = {"", "na", "n/a", "none", "null", "nan", "not reported"}
-IDENTIFIER_HINTS = ("_id", "_record_id", "uuid", "crdc_id")
-
+IDENTIFIER_HINTS = ("uuid", "crdc_id")
 
 @dataclass(frozen=True)
 class PairwiseFeatures:

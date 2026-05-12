@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Any, Optional
 
 import json
 import numpy as np
@@ -243,7 +243,7 @@ def get_categorical_weights(node_name: str) -> dict[str, float] | None:
 class CategoricalFeatureAnalyzer:
     node_schema: NodeSchema
     doc_model: DocAlignmentModel
-    weights: dict[str, float] = field(init=False)
+    weights: Optional[dict[str, float]] = None
 
     @staticmethod
     def classify_strength(score: float) -> str:
@@ -258,7 +258,13 @@ class CategoricalFeatureAnalyzer:
         return "independent"
 
     def __post_init__(self):
-        object.__setattr__(self, "weights", get_categorical_weights(self.node_schema.name))
+        # object.__setattr__(self, "weights", get_categorical_weights(self.node_schema.name))
+        default_weights = get_categorical_weights(self.node_schema.name) or {}
+        incoming_weights = self.weights or {}
+
+        # merge, with incoming weights taking priority
+        merged = {**default_weights, **incoming_weights}
+        object.__setattr__(self, "weights", merged)
 
     def analyze(self, df: pd.DataFrame, a: str, b: str) -> dict[str, Any]:
         if self.weights is None:
