@@ -93,8 +93,6 @@ def compute_cross_node_analysis(
     cross_node_analysis_dfs,
     edges_out
 ):
-    print("compute_node_analysis")
-    print(selected_nodes)
     try:
         full_analysis: dict[str, pd.DataFrame] = {}
         gr_selector = gr.update(choices=selected_nodes, value=selected_nodes[0] if selected_nodes else None)
@@ -103,12 +101,10 @@ def compute_cross_node_analysis(
                 ["functional", "strong", "conditional"]
             )
         ]
-        print(f"edges_out -> {edges_out}")
         
         for _, row in edges_out.iterrows():
             parent = row["parent"]
             child = row["child"]
-            print(parent, "->", child)
             try:
                 # df = node_data_state.get(child)
                 # if df is None or df.empty:
@@ -167,19 +163,13 @@ def create_cross_node_data(
     edges_out,
     num_rows = 50
 ):
-    print(f"create_cross_node_data {(node_data_state.keys())}")
-    print(selected_nodes)
-    print(edges_out)
     full_data: dict[str, pd.DataFrame] = {}
     gr_selector = gr.update(choices=selected_nodes, value=selected_nodes[0] if selected_nodes else None)
 
     try:
-
         for _, row in edges_out.iterrows():
-            print(f"parent-> child {row["parent"]} -> {row["child"]}")
             parent = row["parent"]
             child = row["child"]
-            print("schema")
             schema = next((s for s in schema_state if s.name == child), None)
             # print(f"schema {schema}")
             print("node_data_state")
@@ -194,7 +184,6 @@ def create_cross_node_data(
                 print(f"Missing node_analysis for child={child}. Available keys: {list(all_node_analysis.keys())}")
                 return
             # generate synthetic data
-            print("SyntheticDataGenerator")
             gen = SyntheticDataGenerator(
                 real_rows=df,
                 relationships=node_analysis,
@@ -203,7 +192,6 @@ def create_cross_node_data(
             )
             synth_df = gen.generate(int(num_rows))
             full_data[child] = synth_df
-        print("full_data - gr_selector")
         return full_data, gr_selector, ""
     except Exception as e:
         print(f"exception - generate_cross_node_data {str(e)}")

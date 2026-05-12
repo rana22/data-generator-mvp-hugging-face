@@ -38,17 +38,10 @@ def generate_node_data(
         # run relationship analysis first
         engine = PairwiseRelationshipEvaluator(schema, weights_state)
         results = engine.evaluate_all_pairs(df)
-        
-        print("num results:", len(results))
-        # for i, r in enumerate(results[:5]):
-        #     print(i, r.keys())
-
         if results.empty:
             raise gr.Error("No relationships found. Cannot generate synthetic data.")
        
         # generate synthetic data
-        print(f"real df {df.shape} request {num_rows}")
-        print(f"results {results.shape}")
         gen = SyntheticDataGenerator(
             real_rows=df,
             relationships=results,
@@ -57,8 +50,6 @@ def generate_node_data(
         )
         synth_df = gen.generate(int(num_rows))
         valid_df, invalid_df = gen.validate_rows(synth_df)
-        print(f"synthe sis {synth_df.shape[0]}, analysis {results.shape[0]}")
-
         if cross_node_validation is not None:
             return results, valid_df, invalid_df
         
