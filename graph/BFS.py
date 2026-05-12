@@ -157,8 +157,6 @@ def graph_to_df(graph):
     return pd.DataFrame(rows)
 
 def get_edges_for_nodes(nodes: list[str]):
-    print("get_edges_for_nodes")
-    print(nodes)
     if len(nodes) > 1:
         node_model = load_yaml_from_url(NODE_MODEL_URL)
         graph, all_nodes = build_graph_from_yaml(node_model)

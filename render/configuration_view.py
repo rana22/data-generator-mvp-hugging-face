@@ -4,11 +4,39 @@ from loaders import (
     load_env_to_text,
     get_excel_or_json_data
 )
+from config import (
+    projects_config
+)
+
+def get_env_from_project(project, current_env_text=""):
+    cfg = projects_config.get(project, {})
+    if not cfg:
+        return current_env_text
+
+    # keep any other env lines, replace only these two keys
+    lines = []
+    if current_env_text:
+        lines = [
+            line for line in current_env_text.splitlines()
+            if not line.startswith("NODE_MODEL_URL=")
+            and not line.startswith("PROP_MODEL_URL=")
+        ]
+
+    lines.extend([
+        f"NODE_MODEL_URL={cfg['NODE_MODEL_URL']}",
+        f"PROP_MODEL_URL={cfg['PROP_MODEL_URL']}",
+    ])
+
+    return "\n".join(lines).strip()
 
 def view_configuration():
-    select_project = gr.Dropdown(label="Select node", choices=[
-        "ICDC", "CRDC"
-    ], interactive=True)
+    projects = projects_config.keys()
+    select_project = gr.Dropdown(
+        label="Select node",
+        choices=projects,
+        value="ICDC",
+        interactive=True
+    )
     
     with gr.Row():
         env_text = gr.Textbox(
@@ -22,9 +50,17 @@ def view_configuration():
             file_types=[".env", ".txt"],
             type="filepath",
         )
+
     env_upload.change(
         load_env_to_text,
         inputs=[env_upload],
         outputs=[env_text]
     )
+
+    select_project.change(
+        get_env_from_project,
+        inputs=[select_project, env_text],
+        outputs=[env_text]
+    )
+
     return env_text

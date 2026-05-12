@@ -80,17 +80,17 @@ def call_bio_dataset_service(node_schema: NodeSchema, df: pd.DataFrame) -> list[
 class BioTermFeatureAnalyzer:
     node_schema: NodeSchema
     doc_model: DocAlignmentModel
-    weights: Optional[dict[str, float]] = None
+    all_weights: Optional[dict[str, dict[str, float]]] = None
     _bio_cache: Dict[tuple, float] | None = field(default=None, init=False)
 
     def __post_init__(self) -> None:
         # object.__setattr__(self, "weights", get_bioterm_weights(self.node_schema.name))
-        default_weights = get_bioterm_weights(self.node_schema.name) or {}
-        incoming_weights = self.weights or {}
+        # default_weights = get_bioterm_weights(self.node_schema.name) or {}
+        # incoming_weights = self.weights or {}
 
-        # merge, with incoming weights taking priority
-        merged = {**default_weights, **incoming_weights}
-        object.__setattr__(self, "weights", merged)
+        profiles = self.all_weights or BIOTERM_WEIGHT_PROFILES
+        key = (self.node_schema.name or "").lower()
+        object.__setattr__(self, "weights", profiles.get(key, {}))
 
     @staticmethod
     def classify_strength(score: float) -> str:
@@ -108,7 +108,7 @@ class BioTermFeatureAnalyzer:
     # Load dataset-level bio scores
     # -----------------------------
     def _ensure_cache(self, df: pd.DataFrame):
-        if self.weights is None:
+        if not self.weights:
             return
 
         if self._bio_cache is not None:
@@ -132,7 +132,7 @@ class BioTermFeatureAnalyzer:
     # Main analyzer
     # -----------------------------
     def analyze(self, df: pd.DataFrame, a: str, b: str) -> dict[str, Any]:
-        if self.weights is None:
+        if not self.weights:
             return None
 
         pair = prepare_pair_frame(df, a, b)

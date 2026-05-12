@@ -243,7 +243,7 @@ def get_categorical_weights(node_name: str) -> dict[str, float] | None:
 class CategoricalFeatureAnalyzer:
     node_schema: NodeSchema
     doc_model: DocAlignmentModel
-    weights: Optional[dict[str, float]] = None
+    all_weights: Optional[dict[str, dict[str, float]]] = None
 
     @staticmethod
     def classify_strength(score: float) -> str:
@@ -259,15 +259,18 @@ class CategoricalFeatureAnalyzer:
 
     def __post_init__(self):
         # object.__setattr__(self, "weights", get_categorical_weights(self.node_schema.name))
-        default_weights = get_categorical_weights(self.node_schema.name) or {}
-        incoming_weights = self.weights or {}
+        # default_weights = get_categorical_weights(self.node_schema.name) or {}
+        # incoming_weights = self.weights or {}
 
-        # merge, with incoming weights taking priority
-        merged = {**default_weights, **incoming_weights}
-        object.__setattr__(self, "weights", merged)
+        # # merge, with incoming weights taking priority
+        # merged = {**default_weights, **incoming_weights}
+        # object.__setattr__(self, "weights", merged)
+        profiles = self.all_weights or CATEGORICAL_WEIGHT_PROFILES
+        key = (self.node_schema.name or "").lower()
+        object.__setattr__(self, "weights", profiles.get(key, {}))
 
     def analyze(self, df: pd.DataFrame, a: str, b: str) -> dict[str, Any]:
-        if self.weights is None:
+        if not self.weights:
             return None
         pair = prepare_pair_frame(df, a, b)
         total_rows = len(df)
@@ -276,13 +279,15 @@ class CategoricalFeatureAnalyzer:
         # How much of the original table actually has usable a/b pairs
         support = float(row_count / total_rows) if total_rows else 0.0
         # How well a predicts b using a simple holdout classifier
-        predictive_strength, heldout_accuracy, baseline_accuracy, train_rows, test_rows = predictive_strength_from_holdout(pair, a, b)
+        predictive_strength, heldout_accuracy, baseline_accuracy, \
+        train_rows, test_rows = predictive_strength_from_holdout(pair, a, b)
         
         # “when a is known, how often is b basically fixed?”
         determinism = conditional_determinism(pair, a, b)
         
         stability = stability_from_resamples(pair, a, b)
         doc_alignment = float(self.doc_model.score(a, b))
+        # print(f"support = {support}")
 
         strength = (
             self.weights["support"] * support

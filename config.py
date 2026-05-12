@@ -49,3 +49,24 @@ DISPLAY_COLUMNS = {
         "evidence",
     ],
 }
+
+projects_config = {
+    "ICDC": {
+        "NODE_MODEL_URL": "https://raw.githubusercontent.com/CBIIT/icdc-model-tool/develop/model-desc/icdc-model.yml",
+        "PROP_MODEL_URL": "https://raw.githubusercontent.com/CBIIT/icdc-model-tool/develop/model-desc/icdc-model-props.yml"
+    },
+    "CDS": {
+        "NODE_MODEL_URL": "https://raw.githubusercontent.com/CBIIT/crdc-datahub-models/dev/cache/CDS/7.0.0/cds-model.yml",
+        "PROP_MODEL_URL": "https://raw.githubusercontent.com/CBIIT/crdc-datahub-models/dev/cache/CDS/7.0.0/cds-model-props.yml"
+
+    },
+    "CTDC": {
+        "NODE_MODEL_URL": "https://raw.githubusercontent.com/CBIIT/crdc-datahub-models/prod/cache/CTDC/1.2.0/ctdc_model_file.yaml",
+        "PROP_MODEL_URL": "https://raw.githubusercontent.com/CBIIT/crdc-datahub-models/prod/cache/CTDC/1.2.0/ctdc_model_properties_file.yaml"
+
+    },
+    "GC": {
+        "NODE_MODEL_URL": "https://raw.githubusercontent.com/CBIIT/icdc-model-tool/develop/model-desc/icdc-model.yml",
+        "PROP_MODEL_URL": "https://raw.githubusercontent.com/CBIIT/icdc-model-tool/develop/model-desc/icdc-model-props.yml"
+    },
+}

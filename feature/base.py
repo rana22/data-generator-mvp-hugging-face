@@ -7,8 +7,7 @@ from typing import Any
 import pandas as pd
 
 MISSING_STRINGS = {"", "na", "n/a", "none", "null", "nan", "not reported"}
-IDENTIFIER_HINTS = ("_id", "_record_id", "uuid", "crdc_id")
-
+IDENTIFIER_HINTS = ("_record_id", "uuid", "crdc_id")
 
 def is_missing(value: Any) -> bool:
     if value is None:

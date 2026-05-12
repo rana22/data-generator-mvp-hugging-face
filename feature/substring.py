@@ -101,7 +101,7 @@ def get_substring_weights(node_name: str) -> dict[str, float] | None:
 class SubstringFeatureAnalyzer:
     node_schema: NodeSchema
     doc_model: DocAlignmentModel
-    weights: Optional[dict[str, float]] = None
+    all_weights: Optional[dict[str, dict[str, float]]] = None
 
     def __post_init__(self) -> None:
         if self.node_schema is not None:
@@ -110,12 +110,17 @@ class SubstringFeatureAnalyzer:
             key = "cross_node_match"
         # object.__setattr__(self, "weights", get_substring_weights(key))
 
-        default_weights = get_substring_weights(key) or {}
-        incoming_weights = self.weights or {}
+        # default_weights = get_substring_weights(key) or {}
+        # incoming_weights = self.weights or {}
 
-        # merge, with incoming weights taking priority
-        merged = {**default_weights, **incoming_weights}
-        object.__setattr__(self, "weights", merged)
+        # # merge, with incoming weights taking priority
+        # merged = {**default_weights, **incoming_weights}
+        # object.__setattr__(self, "weights", merged)
+
+        profiles = self.all_weights or SUBSTRING_WEIGHT_PROFILES
+        # key = (self.node_schema.name or "").lower()
+        object.__setattr__(self, "weights", profiles.get(key, {}))
+
 
     @staticmethod
     def classify_strength(score: float) -> str:

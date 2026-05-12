@@ -5,7 +5,7 @@ import pandas as pd
 
 from dataclasses import dataclass
 from typing import Any, Dict
-import os, requests
+import os, requests, json
 import pandas as pd
 
 from feature.doc_alignment import DocAlignmentModel
@@ -52,22 +52,22 @@ class PairwiseRelationshipEvaluator(FeatureBase):
         self.categorical = CategoricalFeatureAnalyzer(
             node_schema=self.node_schema,
             doc_model=self.doc_model,
-            weights=weights.get("categorical", None)
+            all_weights=weights.get("categorical", None)
         )
         self.substring = SubstringFeatureAnalyzer(
             node_schema=self.node_schema,
             doc_model=self.doc_model,
-            weights=weights.get("substring", None)
+            all_weights=weights.get("substring", None)
         )
         self.cluster = ClusteringFeatureAnalyzer(
             node_schema=self.node_schema,
             doc_model=self.doc_model,
-            weights=weights.get("cluster", None)
+            all_weights=weights.get("cluster", None)
         )
         self.bio_term = BioTermFeatureAnalyzer(
             node_schema=self.node_schema,
             doc_model=self.doc_model,
-            weights=weights.get("bio-term", None)
+            all_weights=weights.get("bio-term", None)
         )
 
     def get_model_columns(self, df: pd.DataFrame) -> list[str]:
@@ -85,12 +85,11 @@ class PairwiseRelationshipEvaluator(FeatureBase):
     def evaluate_all_pairs(self, df: pd.DataFrame) -> pd.DataFrame:
         results: list[dict[str, Any]] = []
         columns = self.get_model_columns(df)
-
+        
         for a in columns:
             for b in columns:
                 if a == b:
                     continue
-                # results.append(self.categorical.analyze(df, a, b))
                 cat_result = self.categorical.analyze(df, a, b)
                 if cat_result is not None:
                     results.append(cat_result)
@@ -100,23 +99,23 @@ class PairwiseRelationshipEvaluator(FeatureBase):
                 cluster_result = self.cluster.analyze(df, a, b)
                 if cluster_result is not None:
                     results.append(cluster_result)
-        # bio_term_result = self.bio_term.analyze(df)
-        # if bio_term_result is not None:
-        #     results.append(bio_term_result)
-
         results_df = pd.DataFrame(results)
+        
         if not results_df.empty:
-            results_df = results_df.sort_values(
-                ["strength", "predictive_strength", "support"],
-                ascending=False,
-            ).reset_index(drop=True)
-
+            sort_cols = [c for c in ["strength", "predictive_strength", "support"] if c in results_df.columns]
+            if sort_cols:
+                results_df = results_df.sort_values(sort_cols, ascending=False).reset_index(drop=True)
         return results_df
 
 def build_evaluator(node_schema: NodeSchema) -> PairwiseRelationshipEvaluator:
     return PairwiseRelationshipEvaluator(node_schema=node_schema)
 
-def run_intra_node_analysis(weights_state, schema_state, data_state, selected_node):
+def run_intra_node_analysis(
+    weights_state,
+    schema_state,
+    data_state,
+    selected_node
+):
     try:
         if not schema_state:
             raise gr.Error("Load schema first.")
@@ -132,6 +131,9 @@ def run_intra_node_analysis(weights_state, schema_state, data_state, selected_no
         if df is None or df.empty:
             return {}, {}, f"No data available for node `{selected_node}`.", pd.DataFrame(),
 
+        # if schema.name == "case":
+        #     print(json.dumps(weights_state, indent=2, default=str))
+
         engine = PairwiseRelationshipEvaluator(schema, weights_state)
         results = engine.evaluate_all_pairs(df)
 
@@ -140,7 +142,6 @@ def run_intra_node_analysis(weights_state, schema_state, data_state, selected_no
         features_dfs = dict(tuple(results.groupby('feature_type')))
         # Optional: if you want a markdown report table in the UI
         # report_html = df_to_html2(results)
-        print("refactor run analysis")
 
         results_by_node = {selected_node: results.copy()}
         relationship_by_node = {selected_node: results.copy()}

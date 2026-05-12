@@ -126,7 +126,7 @@ def mean_score(values: list[float]) -> float:
 class FuzzyFeatureAnalyzer:
     node_schema: NodeSchema | None
     doc_model: DocAlignmentModel | None
-    weights: Optional[dict[str, float]] = None
+    all_weights: Optional[dict[str, dict[str, float]]] = None
 
     def __post_init__(self) -> None:
         if self.node_schema is not None:
@@ -134,14 +134,16 @@ class FuzzyFeatureAnalyzer:
         else:
             key = "cross_node_match"
 
-        default_weights = get_fuzzy_weights(key)
-        if default_weights is None:
-            default_weights = FUZZY_WEIGHT_PROFILES["cross_node_match"]
+        # default_weights = get_fuzzy_weights(key)
+        # if default_weights is None:
+        #     default_weights = FUZZY_WEIGHT_PROFILES["cross_node_match"]
 
-        incoming_weights = self.weights or {}
-        # merge, with incoming weights taking priority
-        merged = {**default_weights, **incoming_weights}
-        object.__setattr__(self, "weights", merged)
+        # incoming_weights = self.weights or {}
+        # # merge, with incoming weights taking priority
+        # merged = {**default_weights, **incoming_weights}
+        # object.__setattr__(self, "weights", merged)
+        profiles = self.all_weights or FUZZY_WEIGHT_PROFILES
+        object.__setattr__(self, "weights", profiles.get(key, {}))
 
     @staticmethod
     def classify_strength(score: float) -> str:
@@ -156,7 +158,7 @@ class FuzzyFeatureAnalyzer:
         return "independent"
 
     def analyze(self, df: pd.DataFrame, a: str, b: str) -> dict[str, Any] | None:
-        if self.weights is None:
+        if not self.weights:
             return None
 
         pair = prepare_pair_frame(df, a, b)

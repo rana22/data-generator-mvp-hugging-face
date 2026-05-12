@@ -18,7 +18,6 @@ CLUSTERING_WEIGHT_PROFILES = {
     },
 }
 
-
 def get_clustering_weights(node_name: str) -> dict[str, float]:
     key = (node_name or "").lower()
     return CLUSTERING_WEIGHT_PROFILES.get(key)
@@ -28,16 +27,20 @@ def get_clustering_weights(node_name: str) -> dict[str, float]:
 class ClusteringFeatureAnalyzer:
     node_schema: NodeSchema
     doc_model: DocAlignmentModel
-    weights: Optional[dict[str, float]] = None
+    all_weights: Optional[dict[str, dict[str, float]]] = None
 
     def __post_init__(self) -> None:
         # object.__setattr__(self, "weights", get_clustering_weights(self.node_schema.name))
-        default_weights = get_clustering_weights(self.node_schema.name) or {}
-        incoming_weights = self.weights or {}
+        # default_weights = get_clustering_weights(self.node_schema.name) or {}
+        # incoming_weights = self.weights or {}
 
-        # merge, with incoming weights taking priority
-        merged = {**default_weights, **incoming_weights}
-        object.__setattr__(self, "weights", merged)
+        # # merge, with incoming weights taking priority
+        # merged = {**default_weights, **incoming_weights}
+        # object.__setattr__(self, "weights", merged)
+
+        profiles = self.all_weights or CLUSTERING_WEIGHT_PROFILES
+        key = (self.node_schema.name or "").lower()
+        object.__setattr__(self, "weights", profiles.get(key, {}))
 
     @staticmethod
     def classify_strength(score: float) -> str:
@@ -304,7 +307,7 @@ class ClusteringFeatureAnalyzer:
 
     def analyze(self, df: pd.DataFrame, a: str, b: str) -> dict[str, Any] | None:
         # print(self.weights)
-        if self.weights is None:
+        if not self.weights:
             return None
         
         if not self._is_applicable(df, a, b):

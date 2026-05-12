@@ -1,3 +1,4 @@
+from tkinter.constants import FALSE
 import gradio as gr
 
 README_TEXT = """
@@ -43,5 +44,5 @@ Each row must represent a single entity and include a node type.
 """
 
 def view_read_me_content():
-    with gr.Accordion("Before you start", open=True):
+    with gr.Accordion("Before you start", open=FALSE):
         gr.Markdown(README_TEXT)
