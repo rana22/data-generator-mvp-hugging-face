@@ -135,7 +135,7 @@ class SubstringFeatureAnalyzer:
         return "independent"
 
     def analyze(self, df: pd.DataFrame, a: str, b: str) -> dict[str, Any]:
-        if self.weights is None:
+        if not self.weights:
             return None
         pair = prepare_pair_frame(df, a, b)
         total_rows = len(df)

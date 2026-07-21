@@ -16,6 +16,8 @@ from feature.substring import SubstringFeatureAnalyzer
 from feature.cluster import ClusteringFeatureAnalyzer
 from feature.bio_term_overlap import BioTermFeatureAnalyzer
 
+from config import get_disease_generation_config
+from disease_vocabulary import prepare_generation_rows
 from render.status import build_status_md
 
 @dataclass(frozen=True)
@@ -114,7 +116,10 @@ def run_intra_node_analysis(
     weights_state,
     schema_state,
     data_state,
-    selected_node
+    selected_node,
+    generation_mode=None,
+    requested_disease=None,
+    selected_project=None,
 ):
     try:
         if not schema_state:
@@ -127,9 +132,17 @@ def run_intra_node_analysis(
         if schema is None:
             raise gr.Error(f"Schema for node '{selected_node}' was not found.")
 
-        df = data_state.get(selected_node)
-        if df is None or df.empty:
-            return {}, {}, f"No data available for node `{selected_node}`.", pd.DataFrame(),
+        scope_config = get_disease_generation_config(selected_project)
+        validation, df = prepare_generation_rows(
+            data_state=data_state,
+            selected_node=selected_node,
+            generation_mode=generation_mode,
+            requested_disease=requested_disease,
+            scope_config=scope_config,
+            project_name=selected_project,
+        )
+        if not validation.can_generate or df is None:
+            return {}, {}, validation.message, {}
 
         # if schema.name == "case":
         #     print(json.dumps(weights_state, indent=2, default=str))
@@ -137,7 +150,7 @@ def run_intra_node_analysis(
         engine = PairwiseRelationshipEvaluator(schema, weights_state)
         results = engine.evaluate_all_pairs(df)
 
-        summary_md = build_status_md(schema.name, None, results)
+        summary_md = f"{validation.message}\n\n{build_status_md(schema.name, None, results)}"
 
         features_dfs = dict(tuple(results.groupby('feature_type')))
         # Optional: if you want a markdown report table in the UI

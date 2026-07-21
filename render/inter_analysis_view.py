@@ -13,10 +13,57 @@ from analyze.intra_node import (
 )
 # from cross_evaluator import CrossNodeRelationshipEvaluator, find_selected_path
 from cross_generator import CrossNodeDataGenerator
+from disease_vocabulary import ALL_LOADED_MODE
 from generator import SyntheticDataGenerator
 
-def select_all_nodes(nodes):
-    return nodes
+
+CROSS_NODE_SCOPE_MESSAGE = (
+    "Cross-node analysis and generation currently use all loaded source data only. "
+    f'Select "{ALL_LOADED_MODE}" explicitly to continue. Disease-specific cross-node '
+    "traversal is not available in this implementation."
+)
+
+
+def run_cross_analysis_for_mode(
+    weights_state,
+    schema_state,
+    node_data_state,
+    edges,
+    selected_nodes,
+    generation_mode=None,
+):
+    if generation_mode != ALL_LOADED_MODE:
+        return (
+            {},
+            {},
+            CROSS_NODE_SCOPE_MESSAGE,
+            pd.DataFrame(),
+            pd.DataFrame(),
+            f"<p>{CROSS_NODE_SCOPE_MESSAGE}</p>",
+        )
+    return run_cross_analysis(
+        weights_state,
+        schema_state,
+        node_data_state,
+        edges,
+        selected_nodes,
+    )
+
+
+def clear_cross_generation_results(generation_mode=None):
+    message = "" if generation_mode == ALL_LOADED_MODE else CROSS_NODE_SCOPE_MESSAGE
+    return (
+        {},
+        gr.update(choices=[], value=None),
+        pd.DataFrame(),
+        message,
+        {},
+        gr.update(choices=[], value=None),
+        pd.DataFrame(),
+    )
+
+def select_all_nodes(nodes=None):
+    return nodes or []
 
 def update_node_selector(node_list):
     return gr.update(choices=node_list)
@@ -46,7 +93,16 @@ def generate_cross_node_data(
     node_data_state: Dict[str, pd.DataFrame],
     cross_node_analysis_dfs: pd.DataFrame,
     selected_nodes: list[str],
+    generation_mode=None,
 ):
+    if generation_mode != ALL_LOADED_MODE:
+        return (
+            {},
+            gr.update(choices=[], value=None),
+            pd.DataFrame(),
+            f"<div style='color:#8a5a00;font-weight:700'>{CROSS_NODE_SCOPE_MESSAGE}</div>",
+        )
+
     try:
         cross_gen = CrossNodeDataGenerator()
 
@@ -91,11 +147,18 @@ def compute_cross_node_analysis(
     selected_nodes,
     node_data_state,
     cross_node_analysis_dfs,
-    edges_out
+    edges_out,
+    generation_mode=None,
 ):
+    gr_selector = gr.update(
+        choices=selected_nodes or [],
+        value=selected_nodes[0] if selected_nodes else None,
+    )
+    if generation_mode != ALL_LOADED_MODE:
+        return pd.DataFrame(), gr_selector, {}, CROSS_NODE_SCOPE_MESSAGE
+
     try:
         full_analysis: dict[str, pd.DataFrame] = {}
-        gr_selector = gr.update(choices=selected_nodes, value=selected_nodes[0] if selected_nodes else None)
         filtered_analysis_df = cross_node_analysis_dfs[
             cross_node_analysis_dfs["classification"].str.lower().isin(
                 ["functional", "strong", "conditional"]
@@ -161,10 +224,17 @@ def create_cross_node_data(
     all_node_analysis,
     selected_nodes,
     edges_out,
-    num_rows = 50
+    generation_mode=None,
+    num_rows=50,
 ):
     full_data: dict[str, pd.DataFrame] = {}
-    gr_selector = gr.update(choices=selected_nodes, value=selected_nodes[0] if selected_nodes else None)
+    gr_selector = gr.update(
+        choices=selected_nodes or [],
+        value=selected_nodes[0] if selected_nodes else None,
+    )
+
+    if generation_mode != ALL_LOADED_MODE:
+        return {}, gr_selector, CROSS_NODE_SCOPE_MESSAGE
 
     try:
         for _, row in edges_out.iterrows():
@@ -178,11 +248,11 @@ def create_cross_node_data(
 
             if df is None:
                 print(f"Missing df for child={child}. Available keys: {list(node_data_state.keys())}")
-                return
+                return {}, gr_selector, f"No loaded data is available for node '{child}'."
 
             if node_analysis is None:
                 print(f"Missing node_analysis for child={child}. Available keys: {list(all_node_analysis.keys())}")
-                return
+                return {}, gr_selector, f"No analysis is available for node '{child}'."
             # generate synthetic data
             gen = SyntheticDataGenerator(
                 real_rows=df,
@@ -222,13 +292,18 @@ def view_inter_nodes_analysis(
     full_node_data_state,
     edges,
     edges_out,
-    error_box
+    error_box,
+    generation_mode,
 ):
     print("full node data - view_inter_nodes_analysis")
     log_full_node_data_shapes(full_node_data_state)
     print("view_inter_nodes_analysis")
     # cross node validation
     gr.Markdown("## Cross Node Analysis")
+    gr.Markdown(
+        "Cross-node operations are currently available only in explicit all-loaded mode. "
+        "Their output is not disease-specific."
+    )
     with gr.Row():
         select_all_btn = gr.Button("Select All Nodes")
         uncheck_all_btn = gr.Button("Uncheck All Nodes")
@@ -275,13 +350,14 @@ def view_inter_nodes_analysis(
     edge_frames_state = gr.State({})
 
     cross_btn.click(
-        fn=run_cross_analysis,
+        fn=run_cross_analysis_for_mode,
         inputs=[
             weights_state,
             schema_state,
             full_node_data_state,
             edges,
-            node_selector
+            node_selector,
+            generation_mode,
         ],
         outputs=[
             cross_node_analysis_state, 
@@ -317,6 +393,7 @@ def view_inter_nodes_analysis(
             full_node_data_state,
             cross_node_analysis_dfs,
             node_selector,
+            generation_mode,
         ],
         outputs=[
             edge_frames_state,
@@ -358,7 +435,8 @@ def view_inter_nodes_analysis(
             node_selector,
             full_node_data_state,
             cross_node_analysis_dfs,
-            edges_out
+            edges_out,
+            generation_mode,
         ],
         outputs=[
             nodes_analysis,
@@ -388,6 +466,21 @@ def view_inter_nodes_analysis(
     )
     all_node_data = gr.State({})
     view_node_data = gr.DataFrame()
+
+    generation_mode.change(
+        fn=clear_cross_generation_results,
+        inputs=[generation_mode],
+        outputs=[
+            edge_frames_state,
+            edge_selector,
+            cross_gen_table,
+            cross_gen_error,
+            all_node_data,
+            cross_node_data_selector,
+            view_node_data,
+        ],
+    )
+
     gen_all_data_btn.click(
         fn=create_cross_node_data,
         inputs=[
@@ -395,7 +488,8 @@ def view_inter_nodes_analysis(
             full_node_data_state,
             all_node_analysis,
             node_selector,
-            edges_out
+            edges_out,
+            generation_mode,
         ],
         outputs=[
             all_node_data,

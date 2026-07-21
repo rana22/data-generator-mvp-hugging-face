@@ -5,6 +5,7 @@ from loaders import (
     get_excel_or_json_data
 )
 from config import (
+    DEFAULT_PROJECT_KEY,
     projects_config
 )
 
@@ -32,15 +33,16 @@ def get_env_from_project(project, current_env_text=""):
 def view_configuration():
     projects = projects_config.keys()
     select_project = gr.Dropdown(
-        label="Select node",
+        label="Select project",
         choices=projects,
-        value="ICDC",
+        value=DEFAULT_PROJECT_KEY,
         interactive=True
     )
     
     with gr.Row():
         env_text = gr.Textbox(
             label="Environment variables (.env text)",
+            value=get_env_from_project(DEFAULT_PROJECT_KEY),
             lines=8,
             placeholder="NODE_MODEL_URL=...\nPROP_MODEL_URL=...\nNEO4J_URI=...\nNEO4J_USER=...\nNEO4J_PASSWORD=...",
         )
@@ -63,4 +65,4 @@ def view_configuration():
         outputs=[env_text]
     )
 
-    return env_text
+    return env_text, select_project

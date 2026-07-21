@@ -48,14 +48,14 @@ from config import (
 #                 print(f"{node}: could not read shape ({type(df)}), error={e}")
 
 with gr.Blocks(
-    title="ICDC Synthetic Data Demo"
+    title="Synthetic Data Demo"
 ) as demo:
-    gr.Markdown("# ICDC Synthetic Data Demo\nAnalyze learned property relationships, visualize them, and generate synthetic rows.")
+    gr.Markdown("# Synthetic Data Demo\nAnalyze learned property relationships, visualize them, and generate synthetic rows.")
     
     error_box = gr.HTML(value="")
     view_read_me_content()
 
-    env_text = view_configuration()
+    env_text, selected_project = view_configuration()
 
     node_list_state = gr.State([])
 
@@ -70,12 +70,13 @@ with gr.Blocks(
     weights_state = gr.State(copy.deepcopy(node_features_2_weight))
     weights_state, normalized_weights_state = view_feature_weights(node_list_state, weights_state, normalized_weights_state)
     
-    error_box = view_intra_node_analysis(
+    error_box, generation_mode = view_intra_node_analysis(
         weights_state,
         schema_state, 
         full_node_data_state,
         selected_node_table,
-        error_box
+        error_box,
+        selected_project,
     )
     # log_full_node_data_shapes(full_node_data_state)
 
@@ -89,7 +90,8 @@ with gr.Blocks(
         full_node_data_state,
         edges,
         edges_out,
-        error_box
+        error_box,
+        generation_mode,
     )
 
 def main() -> None:
